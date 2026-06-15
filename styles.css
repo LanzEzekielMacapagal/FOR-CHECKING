@@ -1061,8 +1061,14 @@ body {
   display: flex;
   align-items: center;
   gap: 1rem;
+  width: 100%;
   min-height: 8rem;
+  border: 1px solid #d8e7ec;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
+  background: #fff;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
@@ -1120,6 +1126,33 @@ body {
   object-fit: cover;
   background: #e8f0f3;
   transition: transform 0.28s ease;
+}
+
+.video-thumb-placeholder {
+  display: grid;
+  place-content: center;
+  gap: 0.35rem;
+  background:
+    linear-gradient(135deg, rgba(8, 127, 155, 0.18), rgba(231, 55, 79, 0.12)),
+    #eef7fa;
+  color: var(--gth-teal);
+  text-align: center;
+}
+
+.video-thumb-placeholder span {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.video-thumb-placeholder strong {
+  font-size: 0.95rem;
+  line-height: 1.1;
+}
+
+.video-announcement-thumb.video-thumb-placeholder {
+  width: clamp(8rem, 22vw, 15rem);
+  flex: 0 0 clamp(8rem, 22vw, 15rem);
 }
 
 .video-frame {
@@ -1809,6 +1842,11 @@ body {
     flex-basis: 5.5rem;
   }
 
+  .video-announcement-thumb.video-thumb-placeholder {
+    width: 5.5rem;
+    flex-basis: 5.5rem;
+  }
+
   .video-announcement-action {
     align-self: flex-start;
   }
@@ -1928,6 +1966,11 @@ body {
   }
 
   .video-announcement-thumb {
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .video-announcement-thumb.video-thumb-placeholder {
     width: 100%;
     flex-basis: auto;
   }

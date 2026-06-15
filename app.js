@@ -873,22 +873,101 @@ function extractYoutubeId(url) {
   }
 }
 
+function extractDriveId(url) {
+  try {
+    const parsedUrl = new URL(url);
+    if (!parsedUrl.hostname.includes("drive.google.com")) return "";
+
+    const fileMatch = parsedUrl.pathname.match(/\/file\/d\/([^/]+)/);
+    if (fileMatch) return fileMatch[1];
+
+    const openId = parsedUrl.searchParams.get("id");
+    return openId || "";
+  } catch {
+    return "";
+  }
+}
+
+function getVideoSource(url) {
+  const youtubeId = extractYoutubeId(url);
+  if (youtubeId) {
+    return {
+      provider: "youtube",
+      providerLabel: "YouTube",
+      sourceId: youtubeId,
+      embedUrl: `https://www.youtube.com/embed/${youtubeId}`,
+      thumbnailUrl: `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`
+    };
+  }
+
+  const driveId = extractDriveId(url);
+  if (driveId) {
+    return {
+      provider: "drive",
+      providerLabel: "Google Drive",
+      sourceId: driveId,
+      embedUrl: `https://drive.google.com/file/d/${driveId}/preview`,
+      thumbnailUrl: ""
+    };
+  }
+
+  return null;
+}
+
+function getSavedVideoSource(video) {
+  if (!video) return null;
+  if (video.provider && video.embedUrl) return video;
+
+  const source = getVideoSource(video.url);
+  if (source) return { ...video, ...source };
+
+  if (video.youtubeId) {
+    return {
+      ...video,
+      provider: "youtube",
+      providerLabel: "YouTube",
+      sourceId: video.youtubeId,
+      embedUrl: `https://www.youtube.com/embed/${video.youtubeId}`,
+      thumbnailUrl: `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`
+    };
+  }
+
+  return video;
+}
+
+function createVideoPlaceholder(providerLabel = "Video") {
+  const placeholder = document.createElement("div");
+  placeholder.className = "video-thumb video-thumb-placeholder";
+  placeholder.append(
+    createTextElement("span", "", "VIDEO"),
+    createTextElement("strong", "", providerLabel)
+  );
+  return placeholder;
+}
+
 function renderVideoCard(video, options = {}) {
+  const source = getSavedVideoSource(video);
+
   if (!options.admin) {
     const wrapper = document.createElement("article");
     wrapper.className = "col-12";
 
-    const card = document.createElement("div");
+    const card = document.createElement("button");
     card.className = "announcement-item video-announcement-item";
     card.dataset.videoAction = "watch";
     card.dataset.videoId = video.id;
-    card.role = "button";
-    card.tabIndex = 0;
+    card.type = "button";
 
-    const thumbnail = document.createElement("img");
-    thumbnail.className = "video-announcement-thumb";
-    thumbnail.src = `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`;
-    thumbnail.alt = "";
+    let thumbnail;
+    if (source.thumbnailUrl) {
+      thumbnail = document.createElement("img");
+      thumbnail.className = "video-announcement-thumb";
+      thumbnail.src = source.thumbnailUrl;
+      thumbnail.alt = "";
+    } else {
+      thumbnail = createVideoPlaceholder(source.providerLabel);
+      thumbnail.classList.add("video-announcement-thumb");
+    }
 
     const content = document.createElement("div");
     content.className = "video-announcement-content";
@@ -912,7 +991,7 @@ function renderVideoCard(video, options = {}) {
     details.className = "video-announcement-details";
     details.append(
       createTextElement("span", "", "Recorded lesson"),
-      createTextElement("span", "", "Watch anytime"),
+      createTextElement("span", "", source.providerLabel || "Video"),
       createTextElement("span", "", "Opens player")
     );
 
@@ -934,10 +1013,15 @@ function renderVideoCard(video, options = {}) {
   const card = document.createElement("div");
   card.className = "card video-resource h-100";
 
-  const thumbnail = document.createElement("img");
-  thumbnail.className = "video-thumb";
-  thumbnail.src = `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`;
-  thumbnail.alt = "";
+  let thumbnail;
+  if (source.thumbnailUrl) {
+    thumbnail = document.createElement("img");
+    thumbnail.className = "video-thumb";
+    thumbnail.src = source.thumbnailUrl;
+    thumbnail.alt = "";
+  } else {
+    thumbnail = createVideoPlaceholder(source.providerLabel);
+  }
 
   const body = document.createElement("div");
   body.className = "card-body";
@@ -953,7 +1037,11 @@ function renderVideoCard(video, options = {}) {
   time.className = "text-secondary";
   time.textContent = formatDate(video.createdAt);
 
-  meta.append(classroom, time);
+  const provider = document.createElement("span");
+  provider.className = "badge text-bg-light";
+  provider.textContent = source.providerLabel || "Video";
+
+  meta.append(classroom, provider, time);
 
   const title = document.createElement("h3");
   title.className = "h6 mb-3";
@@ -1033,9 +1121,9 @@ videoForm?.addEventListener("submit", (event) => {
   event.preventDefault();
 
   const url = document.querySelector("#videoUrl").value.trim();
-  const youtubeId = extractYoutubeId(url);
+  const source = getVideoSource(url);
 
-  if (!youtubeId) {
+  if (!source) {
     videoError?.classList.remove("d-none");
     return;
   }
@@ -1045,8 +1133,8 @@ videoForm?.addEventListener("submit", (event) => {
     id: `video-${Date.now()}`,
     classroom: document.querySelector("#videoClassroom").value,
     title: document.querySelector("#videoTitle").value.trim(),
-    youtubeId,
     url,
+    ...source,
     createdAt: new Date().toISOString()
   });
 
@@ -1061,7 +1149,7 @@ document.addEventListener("click", (event) => {
   if (!actionButton) return;
 
   const videos = getVideos();
-  const video = videos.find((item) => item.id === actionButton.dataset.videoId);
+  const video = getSavedVideoSource(videos.find((item) => item.id === actionButton.dataset.videoId));
   if (!video) return;
 
   if (actionButton.dataset.videoAction === "remove") {
@@ -1070,8 +1158,8 @@ document.addEventListener("click", (event) => {
     return;
   }
 
-  if (actionButton.dataset.videoAction === "watch" && videoModal && videoModalFrame && window.bootstrap?.Modal) {
-    videoModalFrame.src = `https://www.youtube.com/embed/${video.youtubeId}`;
+  if (actionButton.dataset.videoAction === "watch" && video.embedUrl && videoModal && videoModalFrame && window.bootstrap?.Modal) {
+    videoModalFrame.src = video.embedUrl;
     if (videoModalLabel) videoModalLabel.textContent = video.title;
     bootstrap.Modal.getOrCreateInstance(videoModal).show();
     return;
