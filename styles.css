@@ -292,6 +292,31 @@ body {
   transform: translateY(-0.35rem);
 }
 
+.course-card .row {
+  min-height: 8rem;
+}
+
+.course-card-custom .course-card-layout {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr);
+  min-height: 8rem;
+}
+
+.course-card-custom .course-card-media,
+.course-card-custom .col-md-9 {
+  width: auto;
+  max-width: none;
+}
+
+.course-card .card-body {
+  min-width: 0;
+}
+
+.course-card h3,
+.course-card p {
+  overflow-wrap: anywhere;
+}
+
 .course-search .form-control {
   width: min(45vw, 16rem);
 }
@@ -323,7 +348,16 @@ body {
 }
 
 .course-workspace-hero-with-cover {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr) auto;
+}
+
+.course-workspace-hero > div {
+  min-width: 0;
+}
+
+.course-workspace-hero h3,
+.course-workspace-hero p {
+  overflow-wrap: anywhere;
 }
 
 .course-workspace-meta {
@@ -490,6 +524,30 @@ body {
   padding: 0 0.75rem 0.75rem;
 }
 
+.course-resource-preview {
+  display: grid;
+  width: 100%;
+  max-height: 18rem;
+  overflow: hidden;
+  border: 1px solid #d8e7ec;
+  border-radius: 0.5rem;
+  background: #f8fbfc;
+}
+
+.course-resource-preview img {
+  width: 100%;
+  max-height: 18rem;
+  object-fit: contain;
+  background: #fff;
+}
+
+.course-resource-preview iframe {
+  width: 100%;
+  height: min(60vh, 18rem);
+  border: 0;
+  background: #fff;
+}
+
 .course-quiz-score {
   display: flex;
   justify-content: space-between;
@@ -509,7 +567,31 @@ body {
   gap: 0.35rem;
 }
 
-.course-quiz-option {
+.course-quiz-question,
+.course-quiz-question-form {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid #e1edf1;
+  border-radius: 0.55rem;
+  background: #fbfdfe;
+}
+
+.course-quiz-question-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.course-quiz-question-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.course-quiz-option,
+.course-answer-choice,
+.course-correct-choice {
   display: flex;
   align-items: center;
   gap: 0.55rem;
@@ -517,6 +599,52 @@ body {
   border: 1px solid #e1edf1;
   border-radius: 0.45rem;
   background: #fbfdfe;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.course-answer-choice,
+.course-correct-choice {
+  cursor: pointer;
+}
+
+.course-quiz-option-correct,
+.course-answer-choice:has(input:checked),
+.course-correct-choice:has(input:checked) {
+  border-color: rgba(8, 127, 155, 0.42);
+  background: #e8f6fa;
+  box-shadow: 0 10px 24px rgba(8, 127, 155, 0.1);
+}
+
+.course-quiz-option-selected {
+  border-color: rgba(231, 55, 79, 0.32);
+  background: #fff4f6;
+}
+
+.course-answer-choice:hover,
+.course-answer-choice:focus-within,
+.course-correct-choice:hover,
+.course-correct-choice:focus-within {
+  border-color: var(--gth-cyan);
+  background: #f2fbfd;
+  box-shadow: 0 12px 28px rgba(8, 127, 155, 0.12);
+  transform: translateY(-0.06rem);
+}
+
+.course-answer-choices,
+.course-correct-choice-group {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.course-correct-choice-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(7.5rem, auto);
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.course-correct-choice-row .form-control {
+  margin-bottom: 0 !important;
 }
 
 .course-quiz-letter {
@@ -1335,6 +1463,7 @@ body {
 .course-strip {
   position: relative;
   display: grid;
+  height: 8rem;
   min-height: 8rem;
   place-items: center;
   color: #fff;
@@ -1387,8 +1516,13 @@ body {
 
 .course-cover-panel {
   display: grid;
+  width: 100%;
+  height: 8rem;
+  max-height: 8rem;
   min-height: 8rem;
   place-items: center;
+  align-self: start;
+  background: #e8f0f3;
   overflow: hidden;
   color: #fff;
 }
@@ -1396,8 +1530,10 @@ body {
 .course-cover-panel img {
   width: 100%;
   height: 100%;
-  min-height: 8rem;
-  object-fit: cover;
+  min-height: 0;
+  object-fit: contain;
+  object-position: center center;
+  background: #fff;
 }
 
 .course-cover-panel span {
@@ -1623,7 +1759,7 @@ body {
 }
 
 .course-workspace-cover {
-  width: min(12rem, 100%);
+  width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 0.5rem;
   object-fit: cover;
@@ -2008,6 +2144,13 @@ body {
   }
 
   .course-strip {
+    height: 5.5rem;
+    min-height: 5.5rem;
+  }
+
+  .course-cover-panel {
+    height: 5.5rem;
+    max-height: 5.5rem;
     min-height: 5.5rem;
   }
 
@@ -2139,6 +2282,11 @@ body {
   .student-section-card .card-body > .d-flex:first-child {
     gap: 0.65rem !important;
     padding-bottom: 0.7rem;
+  }
+
+  .course-card-custom .course-card-layout {
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    min-height: 5.5rem;
   }
 
   .announcement-item,

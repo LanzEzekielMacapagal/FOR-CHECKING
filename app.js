@@ -293,15 +293,6 @@ function renderCourseWorkspace(courseId, triggerCard) {
     createTextElement("strong", "", `${course.progress}%`)
   );
 
-  if (course.cover) {
-    hero.classList.add("course-workspace-hero-with-cover");
-    const cover = document.createElement("img");
-    cover.className = "course-workspace-cover";
-    cover.src = course.cover;
-    cover.alt = `${course.title} cover photo`;
-    hero.append(cover);
-  }
-
   hero.append(heroText, heroMeta);
 
   const progress = document.createElement("div");
@@ -664,15 +655,23 @@ function renderCourseResourceItem(resource) {
   const summaryText = document.createElement("span");
   summaryText.append(
     createTextElement("strong", "", resource.title),
-    createTextElement("small", "text-secondary d-block", resource.file?.name || resource.link || "Reviewer material")
+    createTextElement("small", "text-secondary d-block", resource.description || "Open to view details")
   );
   summary.append(summaryText, createTextElement("span", "badge text-bg-info", "Open"));
 
   const content = document.createElement("div");
   content.className = "course-resource-content";
-  content.append(
-    createTextElement("p", "text-secondary small mb-2", resource.description || "Posted course material")
-  );
+  content.appendChild(createTextElement("p", "text-secondary small mb-2", resource.description || "Posted course material"));
+
+  if (resource.file?.name || resource.link) {
+    const details = document.createElement("p");
+    details.className = "small text-secondary mb-0";
+    details.textContent = resource.file?.name || resource.link;
+    content.appendChild(details);
+  }
+
+  const preview = renderCourseResourcePreview(resource);
+  if (preview) content.appendChild(preview);
 
   const actions = document.createElement("div");
   actions.className = "d-flex flex-wrap gap-2";
@@ -709,6 +708,55 @@ function renderCourseResourceItem(resource) {
   content.appendChild(actions);
   item.append(summary, content);
   return item;
+}
+
+function isImagePath(value = "") {
+  return /\.(apng|avif|gif|jpe?g|png|svg|webp)(\?.*)?$/i.test(value);
+}
+
+function isPdfPath(value = "") {
+  return /\.pdf(\?.*)?$/i.test(value);
+}
+
+function renderCourseResourcePreview(resource) {
+  const file = resource.file;
+  const link = resource.link || "";
+  const preview = document.createElement("div");
+  preview.className = "course-resource-preview";
+
+  if (file?.data && (file.type?.startsWith("image/") || isImagePath(file.name))) {
+    const image = document.createElement("img");
+    image.src = file.data;
+    image.alt = file.name;
+    preview.appendChild(image);
+    return preview;
+  }
+
+  if (file?.data && (file.type === "application/pdf" || isPdfPath(file.name))) {
+    const frame = document.createElement("iframe");
+    frame.src = file.data;
+    frame.title = `${file.name} preview`;
+    preview.appendChild(frame);
+    return preview;
+  }
+
+  if (link && isImagePath(link)) {
+    const image = document.createElement("img");
+    image.src = link;
+    image.alt = resource.title;
+    preview.appendChild(image);
+    return preview;
+  }
+
+  if (link && isPdfPath(link)) {
+    const frame = document.createElement("iframe");
+    frame.src = link;
+    frame.title = `${resource.title} preview`;
+    preview.appendChild(frame);
+    return preview;
+  }
+
+  return null;
 }
 
 function renderStaticCourseResource(resource, course) {
@@ -750,7 +798,8 @@ function renderCourseResourceForm(courseId) {
   description.className = "form-control form-control-sm";
   description.name = "description";
   description.rows = 2;
-  description.placeholder = "Short note for students";
+  description.placeholder = "Preview text students see before opening";
+  description.required = true;
 
   const file = document.createElement("input");
   file.className = "form-control form-control-sm";
@@ -777,18 +826,55 @@ function getQuizSubmission(quizId, student = currentStudent) {
   return getCourseQuizSubmissions().find((submission) => submission.quizId === quizId && submission.studentId === student.id);
 }
 
+function getQuizTypeLabel(type) {
+  if (type === "multiple-choice") return "Multiple Choice";
+  if (type === "true-false") return "True or False";
+  return "Modified True or False";
+}
+
+function getQuizQuestions(quiz) {
+  if (Array.isArray(quiz.questions) && quiz.questions.length) return quiz.questions;
+
+  return [{
+    id: `${quiz.id}-q1`,
+    question: quiz.question,
+    options: quiz.options || [],
+    correctAnswer: quiz.correctAnswer,
+    correction: quiz.correction || ""
+  }];
+}
+
+function getSubmittedAnswer(submission, question, index) {
+  if (!submission) return "";
+  if (submission.answers && Object.prototype.hasOwnProperty.call(submission.answers, question.id)) {
+    return submission.answers[question.id];
+  }
+  return index === 0 ? submission.answer || "" : "";
+}
+
+function getSubmittedCorrection(submission, question, index) {
+  if (!submission) return "";
+  if (submission.corrections && Object.prototype.hasOwnProperty.call(submission.corrections, question.id)) {
+    return submission.corrections[question.id];
+  }
+  return index === 0 ? submission.correction || "" : "";
+}
+
 function getQuizScore(quiz, submission) {
   if (!submission) return 0;
-  return submission.answer === quiz.correctAnswer ? 1 : 0;
+  return getQuizQuestions(quiz).reduce((total, question, index) => {
+    return total + (getSubmittedAnswer(submission, question, index) === question.correctAnswer ? 1 : 0);
+  }, 0);
 }
 
 function getCourseQuizScore(courseId, student = currentStudent) {
   const quizzes = getCourseItems(getCourseQuizzes(), courseId);
   return quizzes.reduce((score, quiz) => {
     const submission = getQuizSubmission(quiz.id, student);
+    const total = getQuizQuestions(quiz).length;
     return {
       points: score.points + getQuizScore(quiz, submission),
-      total: score.total + 1
+      total: score.total + total
     };
   }, { points: 0, total: 0 });
 }
@@ -797,50 +883,70 @@ function renderCourseQuizItem(quiz) {
   const item = document.createElement("details");
   item.className = "course-quiz-item";
 
+  const questions = getQuizQuestions(quiz);
   const submission = getQuizSubmission(quiz.id);
   const score = getQuizScore(quiz, submission);
+  const quizExpired = isPastDue(quiz.dueAt);
   const summary = document.createElement("summary");
   summary.className = "course-quiz-summary";
   const summaryText = document.createElement("span");
   summaryText.append(
     createTextElement("strong", "", quiz.title),
-    createTextElement("small", "text-secondary d-block", quiz.type === "multiple-choice" ? "Multiple Choice" : "Modified True or False")
+    createTextElement("small", "text-secondary d-block", `${getQuizTypeLabel(quiz.type)} - ${questions.length} question${questions.length === 1 ? "" : "s"}`)
   );
-  const summaryBadge = createTextElement("span", `badge ${submission ? "text-bg-success" : "text-bg-info"}`, submission ? `${score}/1 point` : "Open");
+  if (quiz.dueAt) {
+    summaryText.appendChild(createTextElement("small", quizExpired && !submission ? "text-danger d-block" : "text-secondary d-block", `Due ${formatDateTime(quiz.dueAt)}`));
+  }
+  const summaryBadge = createTextElement("span", `badge ${submission ? "text-bg-success" : quizExpired ? "text-bg-warning" : "text-bg-info"}`, submission ? `${score}/${questions.length} points` : quizExpired ? "Closed" : "Open");
   summary.append(summaryText, summaryBadge);
 
   const meta = document.createElement("div");
   meta.className = "d-flex flex-wrap gap-2 align-items-center mb-2";
   meta.append(
-    createTextElement("span", "badge text-bg-info", quiz.type === "multiple-choice" ? "Multiple Choice" : "Modified True or False"),
+    createTextElement("span", "badge text-bg-info", getQuizTypeLabel(quiz.type)),
     createTextElement("small", "text-secondary", formatDate(quiz.createdAt))
   );
+  if (quiz.dueAt) {
+    meta.appendChild(createTextElement("span", quizExpired ? "badge text-bg-warning" : "badge text-bg-info", `Due ${formatDateTime(quiz.dueAt)}`));
+  }
 
   const content = document.createElement("div");
   content.className = "course-quiz-content";
-  content.append(
-    meta,
-    createTextElement("p", "text-secondary mb-2", quiz.question)
-  );
+  content.appendChild(meta);
 
-  if (quiz.type === "multiple-choice") {
-    const options = document.createElement("div");
-    options.className = "course-quiz-options mb-2";
-    quiz.options.forEach((option, index) => {
-      const optionRow = document.createElement("div");
-      optionRow.className = "course-quiz-option";
-      optionRow.append(
-        createTextElement("span", "course-quiz-letter", String.fromCharCode(65 + index)),
-        createTextElement("span", "", option)
-      );
-      options.appendChild(optionRow);
+  if (adminApp || submission) {
+    questions.forEach((question, index) => {
+      const questionBlock = document.createElement("div");
+      questionBlock.className = "course-quiz-question";
+      questionBlock.appendChild(createTextElement("p", "fw-bold mb-2", `${index + 1}. ${question.question}`));
+
+      const options = document.createElement("div");
+      options.className = "course-quiz-options mb-2";
+      const choices = quiz.type === "multiple-choice"
+        ? question.options.map((option, optionIndex) => [String.fromCharCode(65 + optionIndex), option])
+        : [["True", "True"], ["False", "False"]];
+
+      choices.forEach(([value, label]) => {
+        const optionRow = document.createElement("div");
+        const isCorrect = adminApp && question.correctAnswer === value;
+        const isSubmitted = getSubmittedAnswer(submission, question, index) === value;
+        optionRow.className = `course-quiz-option${isCorrect ? " course-quiz-option-correct" : ""}${isSubmitted ? " course-quiz-option-selected" : ""}`;
+        optionRow.append(
+          createTextElement("span", "course-quiz-letter", value),
+          createTextElement("span", "", label)
+        );
+        options.appendChild(optionRow);
+      });
+
+      questionBlock.appendChild(options);
+      if (adminApp) {
+        questionBlock.appendChild(createTextElement("p", "small text-secondary mb-0", `Answer key: ${question.correctAnswer}${question.correction ? ` - ${question.correction}` : ""}`));
+      }
+      content.appendChild(questionBlock);
     });
-    content.appendChild(options);
   }
 
   if (adminApp) {
-    content.appendChild(createTextElement("p", "small text-secondary mb-2", `Answer key: ${quiz.correctAnswer}${quiz.correction ? ` - ${quiz.correction}` : ""}`));
-
     const remove = document.createElement("button");
     remove.className = "btn btn-outline-danger btn-sm";
     remove.type = "button";
@@ -853,37 +959,65 @@ function renderCourseQuizItem(quiz) {
       const result = document.createElement("div");
       result.className = "course-quiz-result";
       result.append(
-        createTextElement("span", "badge text-bg-success", `Score: ${score}/1 point`),
-        createTextElement("small", "text-secondary", `Submitted answer: ${submission.answer}${submission.correction ? ` - ${submission.correction}` : ""}`)
+        createTextElement("span", "badge text-bg-success", `Score: ${score}/${questions.length} points`),
+        createTextElement("small", "text-secondary", "Submitted answers are highlighted above.")
       );
       content.appendChild(result);
+    } else if (quizExpired) {
+      const closed = document.createElement("div");
+      closed.className = "course-quiz-result";
+      closed.append(
+        createTextElement("span", "badge text-bg-warning", "Closed"),
+        createTextElement("small", "text-secondary", `This quiz closed on ${formatDateTime(quiz.dueAt)}.`)
+      );
+      content.appendChild(closed);
     } else {
       const form = document.createElement("form");
       form.className = "course-quiz-answer vstack gap-2";
       form.dataset.courseQuizAnswer = quiz.id;
 
-      if (quiz.type === "multiple-choice") {
-        const select = document.createElement("select");
-        select.className = "form-select form-select-sm";
-        select.name = "answer";
-        select.required = true;
-        select.appendChild(new Option("Choose answer", ""));
-        quiz.options.forEach((option, index) => select.appendChild(new Option(`${String.fromCharCode(65 + index)}. ${option}`, String.fromCharCode(65 + index))));
-        form.appendChild(select);
-      } else {
-        const answer = document.createElement("select");
-        answer.className = "form-select form-select-sm";
-        answer.name = "answer";
-        answer.required = true;
-        answer.append(new Option("Choose answer", ""), new Option("True", "True"), new Option("False", "False"));
+      questions.forEach((question, index) => {
+        const answerBlock = document.createElement("div");
+        answerBlock.className = "course-quiz-question";
+        answerBlock.appendChild(createTextElement("p", "fw-bold mb-2", `${index + 1}. ${question.question}`));
 
-        const correction = document.createElement("input");
-        correction.className = "form-control form-control-sm";
-        correction.name = "correction";
-        correction.type = "text";
-        correction.placeholder = "If false, write the corrected statement";
-        form.append(answer, correction);
-      }
+        const choices = document.createElement("div");
+        choices.className = "course-answer-choices";
+        const answerChoices = quiz.type === "multiple-choice"
+          ? question.options.map((option, optionIndex) => [String.fromCharCode(65 + optionIndex), option])
+          : [["True", "True"], ["False", "False"]];
+
+        answerChoices.forEach(([value, labelText]) => {
+          const label = document.createElement("label");
+          label.className = "course-answer-choice";
+
+          const input = document.createElement("input");
+          input.className = "visually-hidden";
+          input.name = `answer-${question.id}`;
+          input.type = "radio";
+          input.value = value;
+          input.required = true;
+
+          label.append(
+            input,
+            createTextElement("span", "course-quiz-letter", value),
+            createTextElement("span", "", labelText)
+          );
+          choices.appendChild(label);
+        });
+        answerBlock.appendChild(choices);
+
+        if (quiz.type === "modified-true-false") {
+          const correction = document.createElement("input");
+          correction.className = "form-control form-control-sm mt-2";
+          correction.name = `correction-${question.id}`;
+          correction.type = "text";
+          correction.placeholder = "If false, write the corrected statement";
+          answerBlock.appendChild(correction);
+        }
+
+        form.appendChild(answerBlock);
+      });
 
       const button = document.createElement("button");
       button.className = "btn btn-primary btn-sm align-self-start";
@@ -898,6 +1032,128 @@ function renderCourseQuizItem(quiz) {
   return item;
 }
 
+function createQuizCorrectChoice(name, value, text, checked = false) {
+  const label = document.createElement("label");
+  label.className = "course-correct-choice";
+
+  const input = document.createElement("input");
+  input.className = "visually-hidden";
+  input.name = name;
+  input.type = "radio";
+  input.value = value;
+  input.required = true;
+  input.checked = checked;
+
+  label.append(
+    input,
+    createTextElement("span", "course-quiz-letter", value),
+    createTextElement("span", "", text)
+  );
+  return label;
+}
+
+function createQuizQuestionRow(index, activeType = "multiple-choice") {
+  const key = `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`;
+  const row = document.createElement("div");
+  row.className = "course-quiz-question-form";
+  row.dataset.quizQuestionRow = "true";
+  row.dataset.questionIndex = String(index);
+
+  const header = document.createElement("div");
+  header.className = "course-quiz-question-form-header";
+  header.append(
+    createTextElement("strong", "", `Question ${index + 1}`)
+  );
+
+  if (index > 0) {
+    const remove = document.createElement("button");
+    remove.className = "btn btn-outline-danger btn-sm";
+    remove.type = "button";
+    remove.dataset.quizQuestionAction = "remove";
+    remove.textContent = "Remove";
+    header.appendChild(remove);
+  }
+
+  const question = document.createElement("textarea");
+  question.className = "form-control form-control-sm";
+  question.name = `question-${key}`;
+  question.rows = 2;
+  question.placeholder = "Question";
+  question.required = true;
+
+  const mcFields = document.createElement("div");
+  mcFields.className = "course-quiz-fields";
+  mcFields.dataset.quizFields = "multiple-choice";
+  const correctChoiceGroup = document.createElement("div");
+  correctChoiceGroup.className = "course-correct-choice-group";
+
+  ["A", "B", "C", "D"].forEach((letter) => {
+    const choiceRow = document.createElement("div");
+    choiceRow.className = "course-correct-choice-row";
+
+    const option = document.createElement("input");
+    option.className = "form-control form-control-sm";
+    option.name = `option${letter}-${key}`;
+    option.type = "text";
+    option.placeholder = `Choice ${letter}`;
+    option.required = activeType === "multiple-choice";
+
+    choiceRow.append(option, createQuizCorrectChoice(`correctChoice-${key}`, letter, "Correct", letter === "A"));
+    correctChoiceGroup.appendChild(choiceRow);
+  });
+  mcFields.appendChild(correctChoiceGroup);
+
+  const tfFields = document.createElement("div");
+  tfFields.className = "course-quiz-fields d-none";
+  tfFields.dataset.quizFields = "true-false";
+  const tfChoices = document.createElement("div");
+  tfChoices.className = "course-answer-choices";
+  tfChoices.append(
+    createQuizCorrectChoice(`correctTf-${key}`, "True", "True", true),
+    createQuizCorrectChoice(`correctTf-${key}`, "False", "False")
+  );
+  tfFields.appendChild(tfChoices);
+
+  const modifiedFields = document.createElement("div");
+  modifiedFields.className = "course-quiz-fields d-none";
+  modifiedFields.dataset.quizFields = "modified-true-false";
+  const modifiedChoices = document.createElement("div");
+  modifiedChoices.className = "course-answer-choices";
+  modifiedChoices.append(
+    createQuizCorrectChoice(`correctModified-${key}`, "True", "True", true),
+    createQuizCorrectChoice(`correctModified-${key}`, "False", "False")
+  );
+  const correction = document.createElement("input");
+  correction.className = "form-control form-control-sm mt-2";
+  correction.name = `correction-${key}`;
+  correction.type = "text";
+  correction.placeholder = "Correction if the answer is false";
+  modifiedFields.append(modifiedChoices, correction);
+
+  row.append(header, question, mcFields, tfFields, modifiedFields);
+  updateQuizQuestionRowType(row, activeType);
+  return row;
+}
+
+function updateQuizQuestionRowType(row, type) {
+  row.querySelectorAll("[data-quiz-fields]").forEach((group) => {
+    const isActive = group.dataset.quizFields === type;
+    group.classList.toggle("d-none", !isActive);
+    group.querySelectorAll("input, textarea, select").forEach((field) => {
+      const isCorrection = field.name.startsWith("correction-");
+      field.required = isActive && !isCorrection;
+    });
+  });
+}
+
+function refreshQuizQuestionNumbers(container) {
+  container.querySelectorAll("[data-quiz-question-row]").forEach((row, index) => {
+    row.dataset.questionIndex = String(index);
+    const label = row.querySelector(".course-quiz-question-form-header strong");
+    if (label) label.textContent = `Question ${index + 1}`;
+  });
+}
+
 function renderCourseQuizForm(courseId) {
   const panel = document.createElement("details");
   panel.className = "course-add-quiz course-post-form mt-3";
@@ -907,7 +1163,7 @@ function renderCourseQuizForm(courseId) {
   const summaryText = document.createElement("span");
   summaryText.append(
     createTextElement("strong", "", "Add Quiz"),
-    createTextElement("small", "text-secondary d-block", "Create multiple choice or modified true/false")
+    createTextElement("small", "text-secondary d-block", "Create multiple questions with pressable answer keys")
   );
   summary.append(summaryText, createTextElement("span", "badge text-bg-info", "Admin"));
 
@@ -920,7 +1176,11 @@ function renderCourseQuizForm(courseId) {
   type.name = "type";
   type.dataset.quizTypeSelect = "true";
   type.required = true;
-  type.append(new Option("Multiple Choice", "multiple-choice"), new Option("Modified True or False", "modified-true-false"));
+  type.append(
+    new Option("Multiple Choice", "multiple-choice"),
+    new Option("True or False", "true-false"),
+    new Option("Modified True or False", "modified-true-false")
+  );
 
   const title = document.createElement("input");
   title.className = "form-control form-control-sm";
@@ -929,51 +1189,32 @@ function renderCourseQuizForm(courseId) {
   title.placeholder = "Quiz title";
   title.required = true;
 
-  const question = document.createElement("textarea");
-  question.className = "form-control form-control-sm";
-  question.name = "question";
-  question.rows = 3;
-  question.placeholder = "Question";
-  question.required = true;
+  const dueAt = document.createElement("input");
+  dueAt.className = "form-control form-control-sm mt-1";
+  dueAt.name = "dueAt";
+  dueAt.type = "datetime-local";
+  dueAt.required = true;
+  const dueAtLabel = document.createElement("label");
+  dueAtLabel.className = "form-label small fw-bold mb-0";
+  dueAtLabel.append("Quiz due date and time", dueAt);
 
-  const mcFields = document.createElement("div");
-  mcFields.className = "course-quiz-fields";
-  mcFields.dataset.quizFields = "multiple-choice";
-  ["A", "B", "C", "D"].forEach((letter) => {
-    const option = document.createElement("input");
-    option.className = "form-control form-control-sm mb-2";
-    option.name = `option${letter}`;
-    option.type = "text";
-    option.placeholder = `Choice ${letter}`;
-    option.required = true;
-    mcFields.appendChild(option);
-  });
-  const correctChoice = document.createElement("select");
-  correctChoice.className = "form-select form-select-sm";
-  correctChoice.name = "correctChoice";
-  correctChoice.append(new Option("Correct answer: A", "A"), new Option("Correct answer: B", "B"), new Option("Correct answer: C", "C"), new Option("Correct answer: D", "D"));
-  mcFields.appendChild(correctChoice);
+  const questions = document.createElement("div");
+  questions.className = "course-quiz-question-list";
+  questions.dataset.quizQuestions = "true";
+  questions.appendChild(createQuizQuestionRow(0, type.value));
 
-  const tfFields = document.createElement("div");
-  tfFields.className = "course-quiz-fields d-none";
-  tfFields.dataset.quizFields = "modified-true-false";
-  const correctTf = document.createElement("select");
-  correctTf.className = "form-select form-select-sm mb-2";
-  correctTf.name = "correctTf";
-  correctTf.append(new Option("Answer: True", "True"), new Option("Answer: False", "False"));
-  const correction = document.createElement("input");
-  correction.className = "form-control form-control-sm";
-  correction.name = "correction";
-  correction.type = "text";
-  correction.placeholder = "Correction if the answer is false";
-  tfFields.append(correctTf, correction);
+  const addQuestion = document.createElement("button");
+  addQuestion.className = "btn btn-outline-primary btn-sm align-self-start";
+  addQuestion.type = "button";
+  addQuestion.dataset.quizQuestionAction = "add";
+  addQuestion.textContent = "Add Question";
 
   const button = document.createElement("button");
   button.className = "btn btn-primary btn-sm align-self-start";
   button.type = "submit";
   button.textContent = "Post Quiz";
 
-  form.append(type, title, question, mcFields, tfFields, button);
+  form.append(type, title, dueAtLabel, questions, addQuestion, button);
   panel.append(summary, form);
   return panel;
 }
@@ -995,7 +1236,7 @@ function createCustomCourseWorkspace(course, index) {
       ["Learning materials", "Pending"],
       ["Assessment", "Pending"]
     ],
-    resources: ["Course description", "Admin announcements", "Private message admin"],
+    resources: [],
     activity: ["Course created by admin", "Ready for learner access"]
   };
 }
@@ -1010,13 +1251,20 @@ function createCourseCard(course, index) {
   article.dataset.status = "live";
 
   const row = document.createElement("div");
-  row.className = "row g-0";
+  row.className = "row g-0 course-card-layout";
 
   const media = document.createElement("div");
-  media.className = `col-md-3 course-strip course-strip-${accent}`;
-  const stripNumber = document.createElement("span");
-  stripNumber.textContent = code;
-  media.appendChild(stripNumber);
+  media.className = course.cover ? "col-md-3 course-card-media course-cover-panel" : `col-md-3 course-card-media course-strip course-strip-${accent}`;
+  if (course.cover) {
+    const cover = document.createElement("img");
+    cover.src = course.cover;
+    cover.alt = `${course.title} cover photo`;
+    media.appendChild(cover);
+  } else {
+    const stripNumber = document.createElement("span");
+    stripNumber.textContent = code;
+    media.appendChild(stripNumber);
+  }
 
   const contentColumn = document.createElement("div");
   contentColumn.className = "col-md-9";
@@ -1163,14 +1411,7 @@ document.addEventListener("change", (event) => {
   const form = select.closest("[data-course-quiz-form]");
   if (!form) return;
 
-  form.querySelectorAll("[data-quiz-fields]").forEach((group) => {
-    const isActive = group.dataset.quizFields === select.value;
-    group.classList.toggle("d-none", !isActive);
-    group.querySelectorAll("input, select, textarea").forEach((field) => {
-      if (field.name === "correction") return;
-      field.required = isActive;
-    });
-  });
+  form.querySelectorAll("[data-quiz-question-row]").forEach((row) => updateQuizQuestionRowType(row, select.value));
 });
 
 document.addEventListener("submit", (event) => {
@@ -1206,7 +1447,7 @@ document.addEventListener("submit", async (event) => {
   const description = resourceForm.elements.description.value.trim();
   const link = resourceForm.elements.link.value.trim();
   const file = await readStorageFile(resourceForm.elements.file.files?.[0]);
-  if (!title) return;
+  if (!title || !description) return;
 
   const resources = getCourseResources();
   resources.unshift({
@@ -1231,27 +1472,50 @@ document.addEventListener("submit", (event) => {
   const courseId = quizForm.dataset.courseQuizForm;
   const type = quizForm.elements.type.value;
   const title = quizForm.elements.title.value.trim();
-  const question = quizForm.elements.question.value.trim();
-  if (!title || !question) return;
+  const dueAt = quizForm.elements.dueAt.value;
+  if (!title || !dueAt) return;
 
   const quiz = {
     id: `course-quiz-${Date.now()}`,
     courseId,
     type,
     title,
-    question,
+    dueAt,
     createdAt: new Date().toISOString()
   };
 
-  if (type === "multiple-choice") {
-    quiz.options = ["A", "B", "C", "D"].map((letter) => quizForm.elements[`option${letter}`].value.trim());
-    quiz.correctAnswer = quizForm.elements.correctChoice.value;
-    if (quiz.options.some((option) => !option)) return;
-  } else {
-    quiz.options = [];
-    quiz.correctAnswer = quizForm.elements.correctTf.value;
-    quiz.correction = quizForm.elements.correction.value.trim();
-  }
+  const questionRows = Array.from(quizForm.querySelectorAll("[data-quiz-question-row]"));
+  const questions = questionRows.map((row, index) => {
+    const questionText = row.querySelector("textarea")?.value.trim() || "";
+    const question = {
+      id: `q-${Date.now()}-${index}`,
+      question: questionText,
+      options: [],
+      correctAnswer: "",
+      correction: ""
+    };
+
+    if (type === "multiple-choice") {
+      question.options = ["A", "B", "C", "D"].map((letter) => row.querySelector(`input[name^='option${letter}-']`)?.value.trim() || "");
+      question.correctAnswer = row.querySelector("input[name^='correctChoice-']:checked")?.value || "A";
+    } else if (type === "true-false") {
+      question.correctAnswer = row.querySelector("input[name^='correctTf-']:checked")?.value || "True";
+    } else {
+      question.correctAnswer = row.querySelector("input[name^='correctModified-']:checked")?.value || "True";
+      question.correction = row.querySelector("input[name^='correction-']")?.value.trim() || "";
+    }
+
+    return question;
+  });
+
+  if (!questions.length || questions.some((question) => !question.question)) return;
+  if (type === "multiple-choice" && questions.some((question) => question.options.some((option) => !option))) return;
+
+  quiz.questions = questions;
+  quiz.question = questions[0].question;
+  quiz.options = questions[0].options;
+  quiz.correctAnswer = questions[0].correctAnswer;
+  quiz.correction = questions[0].correction;
 
   const quizzes = getCourseQuizzes();
   quizzes.unshift(quiz);
@@ -1267,10 +1531,21 @@ document.addEventListener("submit", (event) => {
   const quizId = answerForm.dataset.courseQuizAnswer;
   const quiz = getCourseQuizzes().find((item) => item.id === quizId);
   if (!quiz) return;
+  if (isPastDue(quiz.dueAt)) {
+    refreshOpenCourseWorkspace(quiz.courseId);
+    return;
+  }
 
-  const answer = answerForm.elements.answer.value;
-  const correction = answerForm.elements.correction?.value.trim() || "";
-  if (!answer) return;
+  const answers = {};
+  const corrections = {};
+  const questions = getQuizQuestions(quiz);
+  const hasAllAnswers = questions.every((question) => {
+    const answer = answerForm.querySelector(`input[name='answer-${question.id}']:checked`)?.value || "";
+    answers[question.id] = answer;
+    corrections[question.id] = answerForm.querySelector(`input[name='correction-${question.id}']`)?.value.trim() || "";
+    return Boolean(answer);
+  });
+  if (!hasAllAnswers) return;
 
   const submissions = getCourseQuizSubmissions().filter((submission) => {
     return !(submission.quizId === quizId && submission.studentId === currentStudent.id);
@@ -1281,8 +1556,10 @@ document.addEventListener("submit", (event) => {
     quizId,
     studentId: currentStudent.id,
     studentName: currentStudent.name,
-    answer,
-    correction,
+    answer: answers[questions[0].id],
+    answers,
+    correction: corrections[questions[0].id],
+    corrections,
     submittedAt: new Date().toISOString()
   });
 
@@ -1291,6 +1568,25 @@ document.addEventListener("submit", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  const questionAction = event.target.closest("[data-quiz-question-action]");
+  if (questionAction) {
+    const form = questionAction.closest("[data-course-quiz-form]");
+    const questionList = form?.querySelector("[data-quiz-questions]");
+    if (!form || !questionList) return;
+
+    if (questionAction.dataset.quizQuestionAction === "add") {
+      const index = questionList.querySelectorAll("[data-quiz-question-row]").length;
+      questionList.appendChild(createQuizQuestionRow(index, form.elements.type.value));
+      return;
+    }
+
+    if (questionAction.dataset.quizQuestionAction === "remove") {
+      questionAction.closest("[data-quiz-question-row]")?.remove();
+      refreshQuizQuestionNumbers(questionList);
+      return;
+    }
+  }
+
   const resourceButton = event.target.closest("[data-course-resource-action='remove']");
   if (resourceButton) {
     const resource = getCourseResources().find((item) => item.id === resourceButton.dataset.resourceId);
@@ -1323,6 +1619,21 @@ function formatDate(value) {
     hour: "numeric",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function isPastDue(value) {
+  return Boolean(value) && new Date(value).getTime() <= Date.now();
 }
 
 function getAllAnnouncementComments() {
