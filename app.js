@@ -20,6 +20,16 @@ const chatMessage = document.querySelector("#chatMessage");
 const chatMessages = document.querySelector("#chatMessages");
 const chatClassroom = document.querySelector("#chatClassroom");
 const chatToggles = document.querySelectorAll(".chat-toggle");
+const courseForm = document.querySelector("#courseForm");
+const courseTitle = document.querySelector("#courseTitle");
+const courseDescription = document.querySelector("#courseDescription");
+const courseCover = document.querySelector("#courseCover");
+const privateMessagePanel = document.querySelector(".private-message-panel");
+const privateMessageStudent = document.querySelector("#privateMessageStudent");
+const privateMessageStudentName = document.querySelector("#privateMessageStudentName");
+const privateMessages = document.querySelector("#privateMessages");
+const privateMessageForm = document.querySelector("#privateMessageForm");
+const privateMessageText = document.querySelector("#privateMessageText");
 const videoForm = document.querySelector("#videoForm");
 const videoError = document.querySelector("#videoError");
 const adminVideos = document.querySelector("#adminVideos");
@@ -126,10 +136,7 @@ const currentStudent = {
 };
 
 const subjectCourseMap = {
-  "OJT Onboarding Essentials": "onboarding",
-  "Safety and Compliance": "safety",
-  "Supervisor Skills Workshop": "supervisor",
-  "General Activity": "onboarding"
+  "General Activity": ""
 };
 
 const demoAnnouncements = [
@@ -186,56 +193,9 @@ const demoInvitations = [
   }
 ];
 
-const courseWorkspaces = {
-  onboarding: {
-    code: "01",
-    title: "OJT Onboarding Essentials",
-    status: "In Progress",
-    progress: 92,
-    accent: "primary",
-    description: "Role orientation, workplace policies, and required first-week modules.",
-    next: "Complete the onboarding checklist and upload supervisor acknowledgment.",
-    modules: [
-      ["Welcome orientation", "Done"],
-      ["Workplace policies", "Done"],
-      ["Supervisor acknowledgment", "Due soon"]
-    ],
-    resources: ["Orientation walkthrough", "OJT checklist PDF", "Company policy guide"],
-    activity: ["Andrea Valdez completed the checklist", "New onboarding comment posted", "GMeet consultation available"]
-  },
-  safety: {
-    code: "02",
-    title: "Safety and Compliance",
-    status: "In Progress",
-    progress: 76,
-    accent: "coral",
-    description: "Incident reporting, lab safety, data privacy, and compliance checks.",
-    next: "Review the safety reminders before class and submit the compliance quiz.",
-    modules: [
-      ["Lab safety briefing", "Done"],
-      ["Incident reporting", "Open"],
-      ["Data privacy basics", "Quiz"]
-    ],
-    resources: ["Safety reminders", "Incident report template", "Privacy policy notes"],
-    activity: ["Jomar Mercado scored 81%", "Safety video posted", "Quiz deadline updated"]
-  },
-  supervisor: {
-    code: "03",
-    title: "Supervisor Skills Workshop",
-    status: "Upcoming",
-    progress: 48,
-    accent: "sand",
-    description: "Coaching checklists, feedback templates, and learner evaluation rubrics.",
-    next: "Preview the workshop packet and prepare one coaching scenario.",
-    modules: [
-      ["Coaching checklist", "Preview"],
-      ["Feedback templates", "Locked"],
-      ["Learner evaluation", "Locked"]
-    ],
-    resources: ["Workshop overview", "Evaluation rubric", "Coaching scenario sample"],
-    activity: ["Draft course prepared", "Resource packet added", "Learner evaluation rubric updated"]
-  }
-};
+const courseWorkspaces = {};
+
+const courseAccentClasses = ["primary", "coral", "sand"];
 
 function createTextElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -304,7 +264,7 @@ function renderCourseWorkspace(courseId, triggerCard) {
   const courseList = triggerCard.closest("#courseList");
   if (!course || !courseList) return;
 
-  courseCards.forEach((card) => {
+  document.querySelectorAll(".course-card").forEach((card) => {
     const isActive = card === triggerCard;
     card.classList.toggle("course-card-active", isActive);
     card.setAttribute("aria-pressed", String(isActive));
@@ -333,6 +293,15 @@ function renderCourseWorkspace(courseId, triggerCard) {
     createTextElement("strong", "", `${course.progress}%`)
   );
 
+  if (course.cover) {
+    hero.classList.add("course-workspace-hero-with-cover");
+    const cover = document.createElement("img");
+    cover.className = "course-workspace-cover";
+    cover.src = course.cover;
+    cover.alt = `${course.title} cover photo`;
+    hero.append(cover);
+  }
+
   hero.append(heroText, heroMeta);
 
   const progress = document.createElement("div");
@@ -353,24 +322,43 @@ function renderCourseWorkspace(courseId, triggerCard) {
 
   const stream = document.createElement("article");
   stream.className = "course-workspace-panel course-workspace-panel-main";
+  const currentNext = getCourseItems(getCourseNextPosts(), courseId)[0];
   stream.append(
     createTextElement("p", "section-label mb-1", "Next up"),
-    createTextElement("h4", "h6 mb-2", course.next)
+    createTextElement("h4", "h6 mb-2", currentNext?.title || course.next)
   );
 
-  const moduleList = document.createElement("div");
-  moduleList.className = "course-module-list";
-  course.modules.forEach(([title, state], index) => {
-    const item = document.createElement("div");
-    item.className = "course-module-item";
-    item.append(
-      createTextElement("span", "course-module-number", String(index + 1).padStart(2, "0")),
-      createTextElement("strong", "", title),
-      createTextElement("span", "badge text-bg-info ms-auto", state)
+  if (currentNext?.message) {
+    stream.appendChild(createTextElement("p", "text-secondary small mb-0", currentNext.message));
+  }
+
+  if (adminApp) stream.appendChild(renderCourseNextForm(courseId, currentNext));
+
+  const quizTitle = createTextElement("h4", "h6 mt-4 mb-2", "Quizzes");
+  const quizList = document.createElement("div");
+  quizList.className = "course-post-list";
+  const quizzes = getCourseItems(getCourseQuizzes(), courseId);
+  const quizScore = getCourseQuizScore(courseId);
+  stream.appendChild(quizTitle);
+  if (adminApp) stream.appendChild(renderCourseQuizForm(courseId));
+
+  if (!adminApp && quizzes.length) {
+    const scoreSummary = document.createElement("div");
+    scoreSummary.className = "course-quiz-score";
+    scoreSummary.append(
+      createTextElement("span", "", "Quiz score"),
+      createTextElement("strong", "", `${quizScore.points}/${quizScore.total} points`)
     );
-    moduleList.appendChild(item);
-  });
-  stream.appendChild(moduleList);
+    stream.appendChild(scoreSummary);
+  }
+
+  if (!quizzes.length) {
+    quizList.appendChild(createTextElement("p", "text-secondary small mb-0", adminApp ? "No quizzes posted yet." : "No quizzes for this course yet."));
+  } else {
+    quizzes.forEach((quiz) => quizList.appendChild(renderCourseQuizItem(quiz)));
+  }
+
+  stream.appendChild(quizList);
   stream.appendChild(renderCourseGradeSummary(courseId));
 
   const side = document.createElement("aside");
@@ -378,10 +366,14 @@ function renderCourseWorkspace(courseId, triggerCard) {
 
   const resourceTitle = createTextElement("h4", "h6 mb-2", "Classwork and resources");
   const resourceList = document.createElement("div");
-  resourceList.className = "vstack gap-2";
+  resourceList.className = "course-post-list";
   course.resources.forEach((resource) => {
-    resourceList.appendChild(createTextElement("button", "btn btn-outline-secondary btn-sm text-start", resource));
+    resourceList.appendChild(renderStaticCourseResource(resource, course));
   });
+  getCourseItems(getCourseResources(), courseId).forEach((resource) => {
+    resourceList.appendChild(renderCourseResourceItem(resource));
+  });
+  if (adminApp) resourceList.appendChild(renderCourseResourceForm(courseId));
 
   const activityTitle = createTextElement("h4", "h6 mt-4 mb-2", adminApp ? "Learner activity" : "Recent activity");
   const activityList = document.createElement("div");
@@ -399,7 +391,9 @@ function renderCourseWorkspace(courseId, triggerCard) {
   workspace.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "nearest" });
 }
 
-courseCards.forEach((card) => {
+function bindCourseCard(card) {
+  if (card.dataset.courseBound === "true") return;
+  card.dataset.courseBound = "true";
   card.tabIndex = 0;
   card.role = "button";
   card.setAttribute("aria-pressed", "false");
@@ -413,7 +407,9 @@ courseCards.forEach((card) => {
     event.preventDefault();
     renderCourseWorkspace(card.dataset.course, card);
   });
-});
+}
+
+courseCards.forEach(bindCourseCard);
 
 dashboardJumps.forEach((jump) => {
   jump.addEventListener("click", () => {
@@ -434,7 +430,7 @@ filterButtons.forEach((button) => {
     filterButtons.forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
 
-    courseCards.forEach((card) => {
+    document.querySelectorAll(".course-card").forEach((card) => {
       const isVisible = filter === "all" || card.dataset.status === filter;
       card.classList.toggle("d-none", !isVisible);
     });
@@ -561,6 +557,756 @@ function saveStoredItems(key, items) {
     // Keep the demo usable if browser storage is unavailable.
   }
 }
+
+function getCustomCourses() {
+  return getStoredItems("gthCourses", []);
+}
+
+function saveCustomCourses(courses) {
+  saveStoredItems("gthCourses", courses);
+}
+
+function getCourseResources() {
+  return getStoredItems("gthCourseResources", []);
+}
+
+function saveCourseResources(resources) {
+  saveStoredItems("gthCourseResources", resources);
+}
+
+function getCourseQuizzes() {
+  return getStoredItems("gthCourseQuizzes", []);
+}
+
+function saveCourseQuizzes(quizzes) {
+  saveStoredItems("gthCourseQuizzes", quizzes);
+}
+
+function getCourseQuizSubmissions() {
+  return getStoredItems("gthCourseQuizSubmissions", []);
+}
+
+function saveCourseQuizSubmissions(submissions) {
+  saveStoredItems("gthCourseQuizSubmissions", submissions);
+}
+
+function getCourseNextPosts() {
+  return getStoredItems("gthCourseNextPosts", []);
+}
+
+function saveCourseNextPosts(posts) {
+  saveStoredItems("gthCourseNextPosts", posts);
+}
+
+function readStorageFile(file) {
+  return new Promise((resolve) => {
+    if (!file) {
+      resolve(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      resolve({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        data: String(reader.result || "")
+      });
+    });
+    reader.addEventListener("error", () => resolve(null));
+    reader.readAsDataURL(file);
+  });
+}
+
+function getCourseItems(items, courseId) {
+  return items
+    .filter((item) => item.courseId === courseId)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+function renderCourseNextForm(courseId, currentNext = {}) {
+  const form = document.createElement("form");
+  form.className = "course-post-form vstack gap-2 mt-3";
+  form.dataset.courseNextForm = courseId;
+
+  const title = document.createElement("input");
+  title.className = "form-control form-control-sm";
+  title.name = "title";
+  title.type = "text";
+  title.placeholder = "Next up title";
+  title.required = true;
+  title.value = currentNext.title || "";
+
+  const message = document.createElement("textarea");
+  message.className = "form-control form-control-sm";
+  message.name = "message";
+  message.rows = 3;
+  message.placeholder = "What should students do next?";
+  message.required = true;
+  message.value = currentNext.message || "";
+
+  const button = document.createElement("button");
+  button.className = "btn btn-primary btn-sm align-self-start";
+  button.type = "submit";
+  button.textContent = "Update Next Up";
+
+  form.append(title, message, button);
+  return form;
+}
+
+function renderCourseResourceItem(resource) {
+  const item = document.createElement("details");
+  item.className = "course-resource-item";
+
+  const summary = document.createElement("summary");
+  summary.className = "course-resource-summary";
+  const summaryText = document.createElement("span");
+  summaryText.append(
+    createTextElement("strong", "", resource.title),
+    createTextElement("small", "text-secondary d-block", resource.file?.name || resource.link || "Reviewer material")
+  );
+  summary.append(summaryText, createTextElement("span", "badge text-bg-info", "Open"));
+
+  const content = document.createElement("div");
+  content.className = "course-resource-content";
+  content.append(
+    createTextElement("p", "text-secondary small mb-2", resource.description || "Posted course material")
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "d-flex flex-wrap gap-2";
+
+  if (resource.file?.data) {
+    const fileLink = document.createElement("a");
+    fileLink.className = "btn btn-outline-secondary btn-sm";
+    fileLink.href = resource.file.data;
+    fileLink.download = resource.file.name;
+    fileLink.textContent = `Open ${resource.file.name}`;
+    actions.appendChild(fileLink);
+  }
+
+  if (resource.link) {
+    const link = document.createElement("a");
+    link.className = "btn btn-outline-secondary btn-sm";
+    link.href = resource.link;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = "Open Link";
+    actions.appendChild(link);
+  }
+
+  if (adminApp) {
+    const remove = document.createElement("button");
+    remove.className = "btn btn-outline-danger btn-sm";
+    remove.type = "button";
+    remove.dataset.courseResourceAction = "remove";
+    remove.dataset.resourceId = resource.id;
+    remove.textContent = "Remove";
+    actions.appendChild(remove);
+  }
+
+  content.appendChild(actions);
+  item.append(summary, content);
+  return item;
+}
+
+function renderStaticCourseResource(resource, course) {
+  const item = document.createElement("details");
+  item.className = "course-resource-item";
+
+  const summary = document.createElement("summary");
+  summary.className = "course-resource-summary";
+  const summaryText = document.createElement("span");
+  summaryText.append(
+    createTextElement("strong", "", resource)
+  );
+  summary.append(summaryText, createTextElement("span", "badge text-bg-info", "Open"));
+
+  const content = document.createElement("div");
+  content.className = "course-resource-content";
+  const text = resource.toLowerCase().includes("description")
+    ? course.description
+    : "Details will appear here when the admin posts related material.";
+  content.appendChild(createTextElement("p", "text-secondary small mb-0", text));
+
+  item.append(summary, content);
+  return item;
+}
+
+function renderCourseResourceForm(courseId) {
+  const form = document.createElement("form");
+  form.className = "course-post-form vstack gap-2 mt-3";
+  form.dataset.courseResourceForm = courseId;
+
+  const title = document.createElement("input");
+  title.className = "form-control form-control-sm";
+  title.name = "title";
+  title.type = "text";
+  title.placeholder = "Reviewer or resource title";
+  title.required = true;
+
+  const description = document.createElement("textarea");
+  description.className = "form-control form-control-sm";
+  description.name = "description";
+  description.rows = 2;
+  description.placeholder = "Short note for students";
+
+  const file = document.createElement("input");
+  file.className = "form-control form-control-sm";
+  file.name = "file";
+  file.type = "file";
+  file.accept = ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*";
+
+  const link = document.createElement("input");
+  link.className = "form-control form-control-sm";
+  link.name = "link";
+  link.type = "url";
+  link.placeholder = "Optional resource link";
+
+  const button = document.createElement("button");
+  button.className = "btn btn-primary btn-sm align-self-start";
+  button.type = "submit";
+  button.textContent = "Post Resource";
+
+  form.append(title, description, file, link, button);
+  return form;
+}
+
+function getQuizSubmission(quizId, student = currentStudent) {
+  return getCourseQuizSubmissions().find((submission) => submission.quizId === quizId && submission.studentId === student.id);
+}
+
+function getQuizScore(quiz, submission) {
+  if (!submission) return 0;
+  return submission.answer === quiz.correctAnswer ? 1 : 0;
+}
+
+function getCourseQuizScore(courseId, student = currentStudent) {
+  const quizzes = getCourseItems(getCourseQuizzes(), courseId);
+  return quizzes.reduce((score, quiz) => {
+    const submission = getQuizSubmission(quiz.id, student);
+    return {
+      points: score.points + getQuizScore(quiz, submission),
+      total: score.total + 1
+    };
+  }, { points: 0, total: 0 });
+}
+
+function renderCourseQuizItem(quiz) {
+  const item = document.createElement("details");
+  item.className = "course-quiz-item";
+
+  const submission = getQuizSubmission(quiz.id);
+  const score = getQuizScore(quiz, submission);
+  const summary = document.createElement("summary");
+  summary.className = "course-quiz-summary";
+  const summaryText = document.createElement("span");
+  summaryText.append(
+    createTextElement("strong", "", quiz.title),
+    createTextElement("small", "text-secondary d-block", quiz.type === "multiple-choice" ? "Multiple Choice" : "Modified True or False")
+  );
+  const summaryBadge = createTextElement("span", `badge ${submission ? "text-bg-success" : "text-bg-info"}`, submission ? `${score}/1 point` : "Open");
+  summary.append(summaryText, summaryBadge);
+
+  const meta = document.createElement("div");
+  meta.className = "d-flex flex-wrap gap-2 align-items-center mb-2";
+  meta.append(
+    createTextElement("span", "badge text-bg-info", quiz.type === "multiple-choice" ? "Multiple Choice" : "Modified True or False"),
+    createTextElement("small", "text-secondary", formatDate(quiz.createdAt))
+  );
+
+  const content = document.createElement("div");
+  content.className = "course-quiz-content";
+  content.append(
+    meta,
+    createTextElement("p", "text-secondary mb-2", quiz.question)
+  );
+
+  if (quiz.type === "multiple-choice") {
+    const options = document.createElement("div");
+    options.className = "course-quiz-options mb-2";
+    quiz.options.forEach((option, index) => {
+      const optionRow = document.createElement("div");
+      optionRow.className = "course-quiz-option";
+      optionRow.append(
+        createTextElement("span", "course-quiz-letter", String.fromCharCode(65 + index)),
+        createTextElement("span", "", option)
+      );
+      options.appendChild(optionRow);
+    });
+    content.appendChild(options);
+  }
+
+  if (adminApp) {
+    content.appendChild(createTextElement("p", "small text-secondary mb-2", `Answer key: ${quiz.correctAnswer}${quiz.correction ? ` - ${quiz.correction}` : ""}`));
+
+    const remove = document.createElement("button");
+    remove.className = "btn btn-outline-danger btn-sm";
+    remove.type = "button";
+    remove.dataset.courseQuizAction = "remove";
+    remove.dataset.quizId = quiz.id;
+    remove.textContent = "Remove";
+    content.appendChild(remove);
+  } else {
+    if (submission) {
+      const result = document.createElement("div");
+      result.className = "course-quiz-result";
+      result.append(
+        createTextElement("span", "badge text-bg-success", `Score: ${score}/1 point`),
+        createTextElement("small", "text-secondary", `Submitted answer: ${submission.answer}${submission.correction ? ` - ${submission.correction}` : ""}`)
+      );
+      content.appendChild(result);
+    } else {
+      const form = document.createElement("form");
+      form.className = "course-quiz-answer vstack gap-2";
+      form.dataset.courseQuizAnswer = quiz.id;
+
+      if (quiz.type === "multiple-choice") {
+        const select = document.createElement("select");
+        select.className = "form-select form-select-sm";
+        select.name = "answer";
+        select.required = true;
+        select.appendChild(new Option("Choose answer", ""));
+        quiz.options.forEach((option, index) => select.appendChild(new Option(`${String.fromCharCode(65 + index)}. ${option}`, String.fromCharCode(65 + index))));
+        form.appendChild(select);
+      } else {
+        const answer = document.createElement("select");
+        answer.className = "form-select form-select-sm";
+        answer.name = "answer";
+        answer.required = true;
+        answer.append(new Option("Choose answer", ""), new Option("True", "True"), new Option("False", "False"));
+
+        const correction = document.createElement("input");
+        correction.className = "form-control form-control-sm";
+        correction.name = "correction";
+        correction.type = "text";
+        correction.placeholder = "If false, write the corrected statement";
+        form.append(answer, correction);
+      }
+
+      const button = document.createElement("button");
+      button.className = "btn btn-primary btn-sm align-self-start";
+      button.type = "submit";
+      button.textContent = "Submit Answer";
+      form.appendChild(button);
+      content.appendChild(form);
+    }
+  }
+
+  item.append(summary, content);
+  return item;
+}
+
+function renderCourseQuizForm(courseId) {
+  const panel = document.createElement("details");
+  panel.className = "course-add-quiz course-post-form mt-3";
+
+  const summary = document.createElement("summary");
+  summary.className = "course-quiz-summary";
+  const summaryText = document.createElement("span");
+  summaryText.append(
+    createTextElement("strong", "", "Add Quiz"),
+    createTextElement("small", "text-secondary d-block", "Create multiple choice or modified true/false")
+  );
+  summary.append(summaryText, createTextElement("span", "badge text-bg-info", "Admin"));
+
+  const form = document.createElement("form");
+  form.className = "course-quiz-form vstack gap-2";
+  form.dataset.courseQuizForm = courseId;
+
+  const type = document.createElement("select");
+  type.className = "form-select form-select-sm";
+  type.name = "type";
+  type.dataset.quizTypeSelect = "true";
+  type.required = true;
+  type.append(new Option("Multiple Choice", "multiple-choice"), new Option("Modified True or False", "modified-true-false"));
+
+  const title = document.createElement("input");
+  title.className = "form-control form-control-sm";
+  title.name = "title";
+  title.type = "text";
+  title.placeholder = "Quiz title";
+  title.required = true;
+
+  const question = document.createElement("textarea");
+  question.className = "form-control form-control-sm";
+  question.name = "question";
+  question.rows = 3;
+  question.placeholder = "Question";
+  question.required = true;
+
+  const mcFields = document.createElement("div");
+  mcFields.className = "course-quiz-fields";
+  mcFields.dataset.quizFields = "multiple-choice";
+  ["A", "B", "C", "D"].forEach((letter) => {
+    const option = document.createElement("input");
+    option.className = "form-control form-control-sm mb-2";
+    option.name = `option${letter}`;
+    option.type = "text";
+    option.placeholder = `Choice ${letter}`;
+    option.required = true;
+    mcFields.appendChild(option);
+  });
+  const correctChoice = document.createElement("select");
+  correctChoice.className = "form-select form-select-sm";
+  correctChoice.name = "correctChoice";
+  correctChoice.append(new Option("Correct answer: A", "A"), new Option("Correct answer: B", "B"), new Option("Correct answer: C", "C"), new Option("Correct answer: D", "D"));
+  mcFields.appendChild(correctChoice);
+
+  const tfFields = document.createElement("div");
+  tfFields.className = "course-quiz-fields d-none";
+  tfFields.dataset.quizFields = "modified-true-false";
+  const correctTf = document.createElement("select");
+  correctTf.className = "form-select form-select-sm mb-2";
+  correctTf.name = "correctTf";
+  correctTf.append(new Option("Answer: True", "True"), new Option("Answer: False", "False"));
+  const correction = document.createElement("input");
+  correction.className = "form-control form-control-sm";
+  correction.name = "correction";
+  correction.type = "text";
+  correction.placeholder = "Correction if the answer is false";
+  tfFields.append(correctTf, correction);
+
+  const button = document.createElement("button");
+  button.className = "btn btn-primary btn-sm align-self-start";
+  button.type = "submit";
+  button.textContent = "Post Quiz";
+
+  form.append(type, title, question, mcFields, tfFields, button);
+  panel.append(summary, form);
+  return panel;
+}
+
+function createCustomCourseWorkspace(course, index) {
+  const accent = courseAccentClasses[index % courseAccentClasses.length];
+
+  courseWorkspaces[course.id] = {
+    code: String(index + 4).padStart(2, "0"),
+    title: course.title,
+    status: adminApp ? "Live" : "In Progress",
+    progress: adminApp ? 0 : 1,
+    accent,
+    cover: course.cover || "",
+    description: course.description,
+    next: "Start reviewing the course materials and wait for new activities from the admin.",
+    modules: [
+      ["Course overview", "Open"],
+      ["Learning materials", "Pending"],
+      ["Assessment", "Pending"]
+    ],
+    resources: ["Course description", "Admin announcements", "Private message admin"],
+    activity: ["Course created by admin", "Ready for learner access"]
+  };
+}
+
+function createCourseCard(course, index) {
+  const accent = courseAccentClasses[index % courseAccentClasses.length];
+  const code = String(index + 4).padStart(2, "0");
+  const statusText = adminApp ? "Live" : "In Progress";
+  const article = document.createElement("article");
+  article.className = "card course-card course-card-custom";
+  article.dataset.course = course.id;
+  article.dataset.status = "live";
+
+  const row = document.createElement("div");
+  row.className = "row g-0";
+
+  const media = document.createElement("div");
+  media.className = `col-md-3 course-strip course-strip-${accent}`;
+  const stripNumber = document.createElement("span");
+  stripNumber.textContent = code;
+  media.appendChild(stripNumber);
+
+  const contentColumn = document.createElement("div");
+  contentColumn.className = "col-md-9";
+
+  const body = document.createElement("div");
+  body.className = "card-body";
+
+  const header = document.createElement("div");
+  header.className = "d-flex justify-content-between gap-2 mb-2";
+  header.append(
+    createTextElement("h3", "h6 mb-0", course.title),
+    createTextElement("span", "badge text-bg-success", statusText)
+  );
+
+  const progressMeta = document.createElement("div");
+  progressMeta.className = "d-flex justify-content-between small mb-1";
+  progressMeta.append(
+    createTextElement("span", "", "Progress"),
+    createTextElement("strong", "", adminApp ? "0%" : "1%")
+  );
+
+  const progress = document.createElement("div");
+  progress.className = "progress";
+  progress.setAttribute("role", "progressbar");
+  progress.setAttribute("aria-label", `${course.title} progress`);
+  progress.setAttribute("aria-valuenow", adminApp ? "0" : "1");
+  progress.setAttribute("aria-valuemin", "0");
+  progress.setAttribute("aria-valuemax", "100");
+
+  const progressBar = document.createElement("div");
+  progressBar.className = `progress-bar ${accent === "coral" ? "bg-coral" : accent === "sand" ? "bg-sand" : ""}`;
+  progressBar.style.width = adminApp ? "0%" : "1%";
+  progress.appendChild(progressBar);
+
+  body.append(
+    header,
+    createTextElement("p", "text-secondary mb-3", course.description),
+    progressMeta,
+    progress
+  );
+
+  if (adminApp) {
+    const actions = document.createElement("div");
+    actions.className = "d-flex flex-wrap gap-2 mt-3";
+    const remove = document.createElement("button");
+    remove.className = "btn btn-outline-danger btn-sm";
+    remove.type = "button";
+    remove.dataset.courseAction = "remove";
+    remove.dataset.courseId = course.id;
+    remove.textContent = "Remove";
+    actions.appendChild(remove);
+    body.appendChild(actions);
+  }
+
+  contentColumn.appendChild(body);
+  row.append(media, contentColumn);
+  article.appendChild(row);
+  bindCourseCard(article);
+  return article;
+}
+
+function renderCustomCourses() {
+  const lists = document.querySelectorAll("#courseList");
+  if (!lists.length) return;
+
+  Object.keys(courseWorkspaces)
+    .filter((courseId) => courseId.startsWith("custom-course-"))
+    .forEach((courseId) => delete courseWorkspaces[courseId]);
+
+  const courses = getCustomCourses();
+  courses.forEach(createCustomCourseWorkspace);
+
+  lists.forEach((list) => {
+    list.querySelectorAll(".course-card-custom").forEach((card) => card.remove());
+    courses.forEach((course, index) => {
+      list.appendChild(createCourseCard(course, index));
+    });
+  });
+}
+
+function readCourseCover(file) {
+  return new Promise((resolve) => {
+    if (!file) {
+      resolve("");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => resolve(""));
+    reader.readAsDataURL(file);
+  });
+}
+
+courseForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const title = courseTitle?.value.trim() || "";
+  const description = courseDescription?.value.trim() || "";
+  if (!title || !description) return;
+
+  const courses = getCustomCourses();
+  const course = {
+    id: `custom-course-${Date.now()}`,
+    title,
+    description,
+    cover: await readCourseCover(courseCover?.files?.[0]),
+    createdAt: new Date().toISOString()
+  };
+
+  courses.unshift(course);
+  saveCustomCourses(courses);
+  courseForm.reset();
+  renderCustomCourses();
+  showStudentSection("courses", { updateHash: true });
+
+  const modal = window.bootstrap?.Modal.getInstance(document.querySelector("#courseModal"));
+  modal?.hide();
+});
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-course-action='remove']");
+  if (!button) return;
+
+  const courseId = button.dataset.courseId;
+  saveCustomCourses(getCustomCourses().filter((course) => course.id !== courseId));
+  saveCourseNextPosts(getCourseNextPosts().filter((item) => item.courseId !== courseId));
+  saveCourseResources(getCourseResources().filter((item) => item.courseId !== courseId));
+  saveCourseQuizzes(getCourseQuizzes().filter((item) => item.courseId !== courseId));
+  saveCourseQuizSubmissions(getCourseQuizSubmissions().filter((item) => item.courseId !== courseId));
+  document.querySelector(".course-workspace")?.remove();
+  renderCustomCourses();
+});
+
+function refreshOpenCourseWorkspace(courseId) {
+  const activeCourseCard = document.querySelector(`.course-card-active[data-course='${courseId}']`);
+  if (activeCourseCard) renderCourseWorkspace(courseId, activeCourseCard);
+}
+
+document.addEventListener("change", (event) => {
+  const select = event.target.closest("[data-quiz-type-select]");
+  if (!select) return;
+
+  const form = select.closest("[data-course-quiz-form]");
+  if (!form) return;
+
+  form.querySelectorAll("[data-quiz-fields]").forEach((group) => {
+    const isActive = group.dataset.quizFields === select.value;
+    group.classList.toggle("d-none", !isActive);
+    group.querySelectorAll("input, select, textarea").forEach((field) => {
+      if (field.name === "correction") return;
+      field.required = isActive;
+    });
+  });
+});
+
+document.addEventListener("submit", (event) => {
+  const nextForm = event.target.closest("[data-course-next-form]");
+  if (!nextForm) return;
+
+  event.preventDefault();
+  const courseId = nextForm.dataset.courseNextForm;
+  const title = nextForm.elements.title.value.trim();
+  const message = nextForm.elements.message.value.trim();
+  if (!title || !message) return;
+
+  const posts = getCourseNextPosts().filter((post) => post.courseId !== courseId);
+  posts.unshift({
+    id: `course-next-${Date.now()}`,
+    courseId,
+    title,
+    message,
+    createdAt: new Date().toISOString()
+  });
+
+  saveCourseNextPosts(posts);
+  refreshOpenCourseWorkspace(courseId);
+});
+
+document.addEventListener("submit", async (event) => {
+  const resourceForm = event.target.closest("[data-course-resource-form]");
+  if (!resourceForm) return;
+
+  event.preventDefault();
+  const courseId = resourceForm.dataset.courseResourceForm;
+  const title = resourceForm.elements.title.value.trim();
+  const description = resourceForm.elements.description.value.trim();
+  const link = resourceForm.elements.link.value.trim();
+  const file = await readStorageFile(resourceForm.elements.file.files?.[0]);
+  if (!title) return;
+
+  const resources = getCourseResources();
+  resources.unshift({
+    id: `course-resource-${Date.now()}`,
+    courseId,
+    title,
+    description,
+    link,
+    file,
+    createdAt: new Date().toISOString()
+  });
+
+  saveCourseResources(resources);
+  refreshOpenCourseWorkspace(courseId);
+});
+
+document.addEventListener("submit", (event) => {
+  const quizForm = event.target.closest("[data-course-quiz-form]");
+  if (!quizForm) return;
+
+  event.preventDefault();
+  const courseId = quizForm.dataset.courseQuizForm;
+  const type = quizForm.elements.type.value;
+  const title = quizForm.elements.title.value.trim();
+  const question = quizForm.elements.question.value.trim();
+  if (!title || !question) return;
+
+  const quiz = {
+    id: `course-quiz-${Date.now()}`,
+    courseId,
+    type,
+    title,
+    question,
+    createdAt: new Date().toISOString()
+  };
+
+  if (type === "multiple-choice") {
+    quiz.options = ["A", "B", "C", "D"].map((letter) => quizForm.elements[`option${letter}`].value.trim());
+    quiz.correctAnswer = quizForm.elements.correctChoice.value;
+    if (quiz.options.some((option) => !option)) return;
+  } else {
+    quiz.options = [];
+    quiz.correctAnswer = quizForm.elements.correctTf.value;
+    quiz.correction = quizForm.elements.correction.value.trim();
+  }
+
+  const quizzes = getCourseQuizzes();
+  quizzes.unshift(quiz);
+  saveCourseQuizzes(quizzes);
+  refreshOpenCourseWorkspace(courseId);
+});
+
+document.addEventListener("submit", (event) => {
+  const answerForm = event.target.closest("[data-course-quiz-answer]");
+  if (!answerForm) return;
+
+  event.preventDefault();
+  const quizId = answerForm.dataset.courseQuizAnswer;
+  const quiz = getCourseQuizzes().find((item) => item.id === quizId);
+  if (!quiz) return;
+
+  const answer = answerForm.elements.answer.value;
+  const correction = answerForm.elements.correction?.value.trim() || "";
+  if (!answer) return;
+
+  const submissions = getCourseQuizSubmissions().filter((submission) => {
+    return !(submission.quizId === quizId && submission.studentId === currentStudent.id);
+  });
+  submissions.push({
+    id: `course-quiz-submission-${Date.now()}`,
+    courseId: quiz.courseId,
+    quizId,
+    studentId: currentStudent.id,
+    studentName: currentStudent.name,
+    answer,
+    correction,
+    submittedAt: new Date().toISOString()
+  });
+
+  saveCourseQuizSubmissions(submissions);
+  refreshOpenCourseWorkspace(quiz.courseId);
+});
+
+document.addEventListener("click", (event) => {
+  const resourceButton = event.target.closest("[data-course-resource-action='remove']");
+  if (resourceButton) {
+    const resource = getCourseResources().find((item) => item.id === resourceButton.dataset.resourceId);
+    saveCourseResources(getCourseResources().filter((item) => item.id !== resourceButton.dataset.resourceId));
+    if (resource) refreshOpenCourseWorkspace(resource.courseId);
+    return;
+  }
+
+  const quizButton = event.target.closest("[data-course-quiz-action='remove']");
+  if (!quizButton) return;
+
+  const quiz = getCourseQuizzes().find((item) => item.id === quizButton.dataset.quizId);
+  saveCourseQuizzes(getCourseQuizzes().filter((item) => item.id !== quizButton.dataset.quizId));
+  saveCourseQuizSubmissions(getCourseQuizSubmissions().filter((item) => item.quizId !== quizButton.dataset.quizId));
+  if (quiz) refreshOpenCourseWorkspace(quiz.courseId);
+});
 
 function getCurrentAuthor() {
   return adminApp ? "Admin" : "Student";
@@ -1982,6 +2728,93 @@ chatToggles.forEach((toggle) => {
   });
 });
 
+function getPrivateMessages() {
+  return getStoredItems("gthPrivateMessages", []);
+}
+
+function getActivePrivateStudentId() {
+  if (privateMessageStudent) return privateMessageStudent.value;
+  return currentStudent.id;
+}
+
+function getStudentById(studentId) {
+  return getAllStudents().find((student) => student.id === studentId) || currentStudent;
+}
+
+function setupPrivateMessageStudents() {
+  if (!privateMessageStudent) return;
+
+  privateMessageStudent.replaceChildren();
+  getAllStudents().forEach((student) => {
+    const option = document.createElement("option");
+    option.value = student.id;
+    option.textContent = `${student.name} - ${classroomTitles[student.classroom]}`;
+    privateMessageStudent.appendChild(option);
+  });
+}
+
+function renderPrivateMessages() {
+  if (!privateMessages) return;
+
+  const studentId = getActivePrivateStudentId();
+  const student = getStudentById(studentId);
+  const messages = getPrivateMessages().filter((message) => message.studentId === studentId);
+  const currentRole = privateMessagePanel?.dataset.privateRole === "admin" ? "admin" : "student";
+
+  if (privateMessageStudentName) privateMessageStudentName.textContent = student.name;
+  privateMessages.replaceChildren();
+
+  if (!messages.length) {
+    const empty = createTextElement("p", "chat-empty text-secondary small mb-0", "No private messages yet.");
+    privateMessages.appendChild(empty);
+    return;
+  }
+
+  messages.forEach((message) => {
+    const item = document.createElement("div");
+    item.className = "chat-message";
+    if (message.role === currentRole) item.classList.add("chat-message-own");
+
+    const meta = document.createElement("small");
+    meta.className = "text-secondary d-block mb-1";
+    meta.textContent = `${message.author} - ${formatDate(message.createdAt)}`;
+
+    const text = createTextElement("p", "mb-0", message.text);
+    item.append(meta, text);
+    privateMessages.appendChild(item);
+  });
+
+  observeMotionElements(privateMessages);
+  privateMessages.scrollTop = privateMessages.scrollHeight;
+}
+
+privateMessageStudent?.addEventListener("change", renderPrivateMessages);
+
+privateMessageForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  const text = privateMessageText?.value.trim() || "";
+  const studentId = getActivePrivateStudentId();
+  const student = getStudentById(studentId);
+  if (!text) return;
+
+  const isAdmin = privateMessagePanel?.dataset.privateRole === "admin";
+  const messages = getPrivateMessages();
+  messages.push({
+    id: `private-message-${Date.now()}`,
+    studentId,
+    classroom: student.classroom,
+    role: isAdmin ? "admin" : "student",
+    author: isAdmin ? "Admin" : student.name,
+    text,
+    createdAt: new Date().toISOString()
+  });
+
+  saveStoredItems("gthPrivateMessages", messages);
+  privateMessageText.value = "";
+  renderPrivateMessages();
+});
+
 function redirectAdminIfLoggedOut() {
   if (adminApp && sessionStorage.getItem("gthAdminLoggedIn") !== "true") {
     window.location.replace("login.html");
@@ -2036,4 +2869,7 @@ renderVideos();
 renderAssignments();
 renderInvitations();
 renderChatMessages();
+renderCustomCourses();
+setupPrivateMessageStudents();
+renderPrivateMessages();
 observeMotionElements();

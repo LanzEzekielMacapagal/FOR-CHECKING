@@ -84,6 +84,7 @@
         <a href="#gmeet" data-student-section-link="gmeet">Live Sessions</a>
         <a href="#grades" data-student-section-link="grades">Performance</a>
         <a href="#student-chat" data-student-section-link="student-chat">Class Chat</a>
+        <a href="#private-messages" data-student-section-link="private-messages">Private Messages</a>
       </aside>
 
       <div class="student-section-content">
@@ -120,64 +121,7 @@
               </div>
             </div>
 
-            <div class="student-course-grid" id="courseList">
-              <article class="card course-card" data-course="onboarding" data-status="live">
-                <div class="row g-0">
-                  <div class="col-md-3 course-strip course-strip-primary"><span>01</span></div>
-                  <div class="col-md-9">
-                    <div class="card-body">
-                      <div class="d-flex justify-content-between gap-2 mb-2">
-                        <h3 class="h6 mb-0">OJT Onboarding Essentials</h3>
-                        <span class="badge text-bg-success">In Progress</span>
-                      </div>
-                      <p class="text-secondary mb-3">Role orientation, workplace policies, and required first-week modules.</p>
-                      <div class="d-flex justify-content-between small mb-1"><span>Progress</span><strong>92%</strong></div>
-                      <div class="progress" role="progressbar" aria-label="Onboarding Essentials progress" aria-valuenow="92" aria-valuemin="0" aria-valuemax="100">
-                        <div class="progress-bar" style="width: 92%"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </article>
-
-              <article class="card course-card" data-course="safety" data-status="live">
-                <div class="row g-0">
-                  <div class="col-md-3 course-strip course-strip-coral"><span>02</span></div>
-                  <div class="col-md-9">
-                    <div class="card-body">
-                      <div class="d-flex justify-content-between gap-2 mb-2">
-                        <h3 class="h6 mb-0">Safety and Compliance</h3>
-                        <span class="badge text-bg-success">In Progress</span>
-                      </div>
-                      <p class="text-secondary mb-3">Incident reporting, lab safety, data privacy, and compliance checks.</p>
-                      <div class="d-flex justify-content-between small mb-1"><span>Progress</span><strong>76%</strong></div>
-                      <div class="progress" role="progressbar" aria-label="Safety and Compliance progress" aria-valuenow="76" aria-valuemin="0" aria-valuemax="100">
-                        <div class="progress-bar bg-coral" style="width: 76%"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </article>
-
-              <article class="card course-card" data-course="supervisor" data-status="draft">
-                <div class="row g-0">
-                  <div class="col-md-3 course-strip course-strip-sand"><span>03</span></div>
-                  <div class="col-md-9">
-                    <div class="card-body">
-                      <div class="d-flex justify-content-between gap-2 mb-2">
-                        <h3 class="h6 mb-0">Supervisor Skills Workshop</h3>
-                        <span class="badge text-bg-warning">Upcoming</span>
-                      </div>
-                      <p class="text-secondary mb-3">Coaching checklists, feedback templates, and learner evaluation rubrics.</p>
-                      <div class="d-flex justify-content-between small mb-1"><span>Readiness</span><strong>48%</strong></div>
-                      <div class="progress" role="progressbar" aria-label="Supervisor Skills Workshop readiness" aria-valuenow="48" aria-valuemin="0" aria-valuemax="100">
-                        <div class="progress-bar bg-sand" style="width: 48%"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            </div>
+            <div class="student-course-grid" id="courseList"></div>
           </div>
         </section>
 
@@ -245,6 +189,24 @@
             <form class="chat-form d-flex gap-2 mt-2" id="chatForm">
               <label class="visually-hidden" for="chatMessage">Message</label>
               <input class="form-control" id="chatMessage" type="text" placeholder="Type a message" required>
+              <button class="btn btn-primary" type="submit">Send</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="card student-section-card" id="private-messages" data-student-section="private-messages">
+          <div class="card-body private-message-panel" data-private-role="student">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <p class="section-label mb-1">Direct support</p>
+                <h2 class="h5 mb-0">Private Messages</h2>
+              </div>
+              <span class="badge text-bg-info align-self-start" id="privateMessageStudentName">Student</span>
+            </div>
+            <div class="chat-messages private-message-thread" id="privateMessages" aria-live="polite"></div>
+            <form class="chat-form d-flex gap-2 mt-2" id="privateMessageForm">
+              <label class="visually-hidden" for="privateMessageText">Private message</label>
+              <input class="form-control" id="privateMessageText" type="text" placeholder="Message admin privately" required>
               <button class="btn btn-primary" type="submit">Send</button>
             </form>
           </div>

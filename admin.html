@@ -95,6 +95,7 @@
           <a href="#invitations" data-student-section-link="invitations">Live Sessions</a>
           <a href="#courses" data-student-section-link="courses">Courses</a>
           <a href="#class-chat" data-student-section-link="class-chat">Class Chat</a>
+          <a href="#private-messages" data-student-section-link="private-messages">Private Messages</a>
           <a href="#documents" data-student-section-link="documents">Operations</a>
         </aside>
 
@@ -313,64 +314,7 @@
                 </div>
               </div>
 
-              <div class="vstack gap-3" id="courseList">
-                <article class="card course-card" data-course="onboarding" data-status="live">
-                  <div class="row g-0">
-                    <div class="col-md-3 course-strip course-strip-primary"><span>01</span></div>
-                    <div class="col-md-9">
-                      <div class="card-body">
-                        <div class="d-flex justify-content-between gap-2 mb-2">
-                          <h3 class="h6 mb-0">OJT Onboarding Essentials</h3>
-                          <span class="badge text-bg-success">Live</span>
-                        </div>
-                        <p class="text-secondary mb-3">Role orientation, workplace policies, and required first-week modules.</p>
-                        <div class="d-flex justify-content-between small mb-1"><span>Progress</span><strong>92%</strong></div>
-                        <div class="progress" role="progressbar" aria-label="Onboarding Essentials progress" aria-valuenow="92" aria-valuemin="0" aria-valuemax="100">
-                          <div class="progress-bar" style="width: 92%"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-
-                <article class="card course-card" data-course="safety" data-status="live">
-                  <div class="row g-0">
-                    <div class="col-md-3 course-strip course-strip-coral"><span>02</span></div>
-                    <div class="col-md-9">
-                      <div class="card-body">
-                        <div class="d-flex justify-content-between gap-2 mb-2">
-                          <h3 class="h6 mb-0">Safety and Compliance</h3>
-                          <span class="badge text-bg-success">Live</span>
-                        </div>
-                        <p class="text-secondary mb-3">Incident reporting, lab safety, data privacy, and compliance checks.</p>
-                        <div class="d-flex justify-content-between small mb-1"><span>Progress</span><strong>76%</strong></div>
-                        <div class="progress" role="progressbar" aria-label="Safety and Compliance progress" aria-valuenow="76" aria-valuemin="0" aria-valuemax="100">
-                          <div class="progress-bar bg-coral" style="width: 76%"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-
-                <article class="card course-card" data-course="supervisor" data-status="draft">
-                  <div class="row g-0">
-                    <div class="col-md-3 course-strip course-strip-sand"><span>03</span></div>
-                    <div class="col-md-9">
-                      <div class="card-body">
-                        <div class="d-flex justify-content-between gap-2 mb-2">
-                          <h3 class="h6 mb-0">Supervisor Skills Workshop</h3>
-                          <span class="badge text-bg-warning">Draft</span>
-                        </div>
-                        <p class="text-secondary mb-3">Coaching checklists, feedback templates, and learner evaluation rubrics.</p>
-                        <div class="d-flex justify-content-between small mb-1"><span>Readiness</span><strong>48%</strong></div>
-                        <div class="progress" role="progressbar" aria-label="Supervisor Skills Workshop readiness" aria-valuenow="48" aria-valuemin="0" aria-valuemax="100">
-                          <div class="progress-bar bg-sand" style="width: 48%"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              </div>
+              <div class="vstack gap-3" id="courseList"></div>
             </div>
           </section>
         </div>
@@ -427,6 +371,27 @@
           <form class="chat-form d-flex gap-2 mt-2" id="chatForm">
             <label class="visually-hidden" for="chatMessage">Message</label>
             <input class="form-control" id="chatMessage" type="text" placeholder="Type a message" required>
+            <button class="btn btn-primary" type="submit">Send</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="card student-section-card" id="private-messages" data-student-section="private-messages">
+        <div class="card-body private-message-panel" data-private-role="admin">
+          <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+            <div>
+              <p class="section-label mb-1">Direct support</p>
+              <h2 class="h5 mb-0">Private Messages</h2>
+            </div>
+            <label class="form-label mb-0 private-message-student">
+              Student
+              <select class="form-select form-select-sm mt-1" id="privateMessageStudent"></select>
+            </label>
+          </div>
+          <div class="chat-messages private-message-thread" id="privateMessages" aria-live="polite"></div>
+          <form class="chat-form d-flex gap-2 mt-2" id="privateMessageForm">
+            <label class="visually-hidden" for="privateMessageText">Private message</label>
+            <input class="form-control" id="privateMessageText" type="text" placeholder="Write a private message" required>
             <button class="btn btn-primary" type="submit">Send</button>
           </form>
         </div>
@@ -526,7 +491,7 @@
 
     <div class="modal fade" id="courseModal" tabindex="-1" aria-labelledby="courseModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
-        <form class="modal-content">
+        <form class="modal-content" id="courseForm">
           <div class="modal-header">
             <div>
               <p class="section-label mb-1">Create course</p>
@@ -535,13 +500,13 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body vstack gap-3">
-            <label class="form-label mb-0">Course title<input class="form-control mt-1" type="text" placeholder="Enter course name"></label>
-            <label class="form-label mb-0">Delivery type<select class="form-select mt-1"><option>Self-paced</option><option>Instructor-led</option><option>Blended</option></select></label>
-            <label class="form-label mb-0">Description<textarea class="form-control mt-1" rows="4" placeholder="Describe the learning goal"></textarea></label>
+            <label class="form-label mb-0">Course title<input class="form-control mt-1" id="courseTitle" type="text" placeholder="Enter course name" required></label>
+            <label class="form-label mb-0">Cover photo<input class="form-control mt-1" id="courseCover" type="file" accept="image/*"></label>
+            <label class="form-label mb-0">Description<textarea class="form-control mt-1" id="courseDescription" rows="4" placeholder="Describe the learning goal" required></textarea></label>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-primary">Create</button>
+            <button type="submit" class="btn btn-primary">Create</button>
           </div>
         </form>
       </div>
